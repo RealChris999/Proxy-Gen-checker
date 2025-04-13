@@ -12,12 +12,12 @@ import threading
 init(autoreset=True)
 
 # Global configuration
-MAX_WORKERS = 15  # threads 
-TIMEOUT = 5  # Χρόνος αναμονής για connections
-TEST_URL = "http://www.google.com"  # url search
-PRINT_LOCK = threading.Lock()  
+MAX_WORKERS = 15
+TIMEOUT = 5
+TEST_URL = "http://www.google.com"
+PRINT_LOCK = threading.Lock()
 
-# banner
+# Enhanced Banner
 def banner():
     print(Fore.RED + r"""
     ██╗   ██╗██╗██████╗ ██╗   ██╗███████╗
@@ -26,9 +26,10 @@ def banner():
     ╚██╗ ██╔╝██║██╔══██╗██║   ██║╚════██║
      ╚████╔╝ ██║██║  ██║╚██████╔╝███████║
       ╚═══╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
-    """ + Style.RESET_ALL) 
-    print(Fore.RED + "Proxy Generator & Validator Tool By Virus Team" + Style.RESET_ALL)
-    print(Fore.GREEN + "Smooth Printing Edition by Realchris" + Style.RESET_ALL)
+    """ + Style.RESET_ALL)
+    print(Fore.CYAN + "Proxy Generator & Validator Tool By Virus Team" + Style.RESET_ALL)
+    print(Fore.GREEN + "Updated version 14/4/25" + Style.RESET_ALL)
+    print(Fore.WHITE + "Dev: Realchris" + Style.RESET_ALL)
     print("\n")
 
 # Smooth print function
@@ -39,7 +40,118 @@ def smooth_print(message, color=Fore.WHITE, delay=0.01):
             time.sleep(delay)
         print(Style.RESET_ALL)
 
-# Validate proxy with smooth printing
+# Validation functions
+def validate_socks4(proxy):
+    ip, port = proxy.split(':')
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(TIMEOUT)
+        s.connect((ip, int(port)))
+        
+        # SOCKS4 connect request
+        request = bytearray()
+        request.append(0x04)  # SOCKS version 4
+        request.append(0x01)  # CONNECT command
+        request.append((80 >> 8) & 0xff)
+        request.append(80 & 0xff)
+        request.extend([127, 0, 0, 1])  # IP for test
+        request.append(0x00)  # User ID
+        
+        s.send(request)
+        response = s.recv(8)
+        
+        if len(response) >= 2 and response[1] == 0x5a:
+            return True
+    except:
+        return False
+    finally:
+        try:
+            s.close()
+        except:
+            pass
+    return False
+
+def validate_socks5(proxy):
+    ip, port = proxy.split(':')
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(TIMEOUT)
+        s.connect((ip, int(port)))
+        
+        # SOCKS5 handshake
+        s.send(bytearray([0x05, 0x01, 0x00]))
+        response = s.recv(2)
+        
+        if response[0] != 0x05 or response[1] != 0x00:
+            return False
+            
+        # SOCKS5 connect request
+        request = bytearray()
+        request.append(0x05)  # SOCKS version 5
+        request.append(0x01)  # CONNECT command
+        request.append(0x00)  # Reserved
+        request.append(0x01)  # IPv4 address
+        request.extend([8, 8, 8, 8])  # Google DNS
+        request.append((53 >> 8) & 0xff)  # DNS port
+        request.append(53 & 0xff)
+        
+        s.send(request)
+        response = s.recv(10)
+        
+        if response[1] == 0x00:
+            return True
+    except:
+        return False
+    finally:
+        try:
+            s.close()
+        except:
+            pass
+    return False
+
+def validate_http(proxy):
+    try:
+        proxies = {
+            'http': f'http://{proxy}',
+            'https': f'http://{proxy}'
+        }
+        response = requests.get(TEST_URL, proxies=proxies, timeout=TIMEOUT)
+        if response.status_code == 200:
+            return True
+    except:
+        return False
+    return False
+
+def validate_https(proxy):
+    try:
+        proxies = {
+            'http': f'https://{proxy}',
+            'https': f'https://{proxy}'
+        }
+        response = requests.get(TEST_URL.replace("http://", "https://"), 
+                             proxies=proxies, 
+                             timeout=TIMEOUT, 
+                             verify=False)
+        if response.status_code == 200:
+            return True
+    except:
+        return False
+    return False
+
+def generate_proxies(proxy_type, count):
+    common_ports = {
+        'SOCKS4': [1080, 4145, 2525, 8000],
+        'SOCKS5': [1080, 9050, 9150, 9999],
+        'HTTP': [80, 8080, 3128, 8888],
+        'HTTPS': [443, 8443, 4443, 10443]
+    }
+    proxies = []
+    for _ in range(count):
+        ip = ".".join(str(random.randint(1, 255)) for _ in range(4))
+        port = random.choice(common_ports.get(proxy_type, [8080, 8888]))
+        proxies.append(f"{ip}:{port}")
+    return proxies
+
 def validate_and_print(proxy, validate_func, proxy_type):
     try:
         start_time = time.time()
@@ -53,19 +165,15 @@ def validate_and_print(proxy, validate_func, proxy_type):
         with PRINT_LOCK:
             smooth_print(status + details, color)
         
-        return is_valid
+        return proxy if is_valid else None
     except Exception as e:
         with PRINT_LOCK:
             smooth_print(f"[ERROR] {proxy} - {str(e)}", Fore.RED)
-        return False
+        return None
 
-# [Rest of the functions remain the same as previous version...]
-
-# Main function with improved flow
 def main():
     banner()
     
-    # Display options with smooth printing
     options = [
         "[1] SOCKS4",
         "[2] SOCKS5", 
@@ -94,14 +202,12 @@ def main():
     
     smooth_print(f"\nGenerating and validating {count} proxies...\n", Fore.YELLOW)
     
-    # Generate proxies
     proxy_type = ["SOCKS4", "SOCKS5", "HTTP", "HTTPS"][choice-1]
     validate_func = [validate_socks4, validate_socks5, validate_http, validate_https][choice-1]
     
     proxies = generate_proxies(proxy_type, count)
     valid_proxies = []
     
-    # Process proxies with controlled threading
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = []
         for proxy in proxies:
@@ -113,13 +219,13 @@ def main():
                     proxy_type
                 )
             )
-            time.sleep(0.05)  # Small delay between starting threads
+            time.sleep(0.05)
         
         for future in concurrent.futures.as_completed(futures):
-            if future.result():
-                valid_proxies.append(future.result())
+            result = future.result()
+            if result:
+                valid_proxies.append(result)
 
-    # Save results
     if valid_proxies:
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         filename = f"hit_{proxy_type.lower()}_{timestamp}.txt"
