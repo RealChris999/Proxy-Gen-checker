@@ -19,7 +19,7 @@ def banner():
     (__\_)(____)(___/ (__) (__\_)\_/\_/\_)(_/(____)
     """ + Style.RESET_ALL)
     print(Fore.YELLOW + "Proxy Generator & Validator Tool" + Style.RESET_ALL)
-    print(Fore.YELLOW + "Created by: Your Name" + Style.RESET_ALL)
+    print(Fore.YELLOW + "Created by: RealChris" + Style.RESET_ALL)
     print("\n")
 
 # Validate SOCKS4 proxy
