@@ -26,14 +26,8 @@ def banner():
     ╚██╗ ██╔╝██║██╔══██╗██║   ██║╚════██║
      ╚████╔╝ ██║██║  ██║╚██████╔╝███████║
       ╚═══╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
-    """ + Style.RESET_ALL)
-    print(Fore.CYAN + r"""
-     ____  ____  ___  ____  ____   __   _  _  ____ 
-    (  _ \( ___)/ __)(_  _)(  _ \ / _\ ( \/ )(  __)
-     )   / )__) \__ \  )(   )   //    \/ \/ \ ) _) 
-    (__\_)(____)(___/ (__) (__\_)\_/\_/\_)(_/(____)
-    """ + Style.RESET_ALL)
-    print(Fore.YELLOW + "Proxy Generator & Validator Tool By Virus Team" + Style.RESET_ALL)
+    """ + Style.RESET_ALL) 
+    print(Fore.RED + "Proxy Generator & Validator Tool By Virus Team" + Style.RESET_ALL)
     print(Fore.GREEN + "Smooth Printing Edition by Realchris" + Style.RESET_ALL)
     print("\n")
 
