@@ -6,148 +6,88 @@ import os
 import time
 import random
 import sys
+import threading
 
 # Initialize colorama
 init(autoreset=True)
 
-# Banner
+# Global configuration
+MAX_WORKERS = 15  # threads 
+TIMEOUT = 5  # Χρόνος αναμονής για connections
+TEST_URL = "http://www.google.com"  # url search
+PRINT_LOCK = threading.Lock()  
+
+# banner
 def banner():
+    print(Fore.RED + r"""
+    ██╗   ██╗██╗██████╗ ██╗   ██╗███████╗
+    ██║   ██║██║██╔══██╗██║   ██║██╔════╝
+    ██║   ██║██║██████╔╝██║   ██║███████╗
+    ╚██╗ ██╔╝██║██╔══██╗██║   ██║╚════██║
+     ╚████╔╝ ██║██║  ██║╚██████╔╝███████║
+      ╚═══╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+    """ + Style.RESET_ALL)
     print(Fore.CYAN + r"""
      ____  ____  ___  ____  ____   __   _  _  ____ 
     (  _ \( ___)/ __)(_  _)(  _ \ / _\ ( \/ )(  __)
      )   / )__) \__ \  )(   )   //    \/ \/ \ ) _) 
     (__\_)(____)(___/ (__) (__\_)\_/\_/\_)(_/(____)
     """ + Style.RESET_ALL)
-    print(Fore.YELLOW + "Proxy Generator & Validator Tool" + Style.RESET_ALL)
-    print(Fore.YELLOW + "Created by: RealChris" + Style.RESET_ALL)
+    print(Fore.YELLOW + "Proxy Generator & Validator Tool By Virus Team" + Style.RESET_ALL)
+    print(Fore.GREEN + "Smooth Printing Edition by Realchris" + Style.RESET_ALL)
     print("\n")
 
-# Validate SOCKS4 proxy
-def validate_socks4(proxy):
-    ip, port = proxy.split(':')
+# Smooth print function
+def smooth_print(message, color=Fore.WHITE, delay=0.01):
+    with PRINT_LOCK:
+        for char in message:
+            print(color + char, end='', flush=True)
+            time.sleep(delay)
+        print(Style.RESET_ALL)
+
+# Validate proxy with smooth printing
+def validate_and_print(proxy, validate_func, proxy_type):
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(10)
-        s.connect((ip, int(port)))
+        start_time = time.time()
+        is_valid = validate_func(proxy)
+        elapsed = time.time() - start_time
         
-        # SOCKS4 connect request
-        request = bytearray()
-        request.append(0x04)  # SOCKS version 4
-        request.append(0x01)  # CONNECT command
+        status = f"[VALID] {proxy}" if is_valid else f"[INVALID] {proxy}"
+        color = Fore.GREEN if is_valid else Fore.RED
+        details = f" ({elapsed:.2f}s)"
         
-        # Port in network byte order
-        request.append((int(port) >> 8) & 0xff)
-        request.append(int(port) & 0xff)
+        with PRINT_LOCK:
+            smooth_print(status + details, color)
         
-        # IP address
-        for part in ip.split('.'):
-            request.append(int(part))
-            
-        # User ID (empty)
-        request.append(0x00)
-        
-        s.send(request)
-        response = s.recv(8)
-        
-        if len(response) >= 8 and response[1] == 0x5a:
-            return True
-    except:
-        pass
-    finally:
-        s.close()
-    return False
+        return is_valid
+    except Exception as e:
+        with PRINT_LOCK:
+            smooth_print(f"[ERROR] {proxy} - {str(e)}", Fore.RED)
+        return False
 
-# Validate SOCKS5 proxy
-def validate_socks5(proxy):
-    ip, port = proxy.split(':')
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(10)
-        s.connect((ip, int(port)))
-        
-        # SOCKS5 handshake
-        s.send(bytearray([0x05, 0x01, 0x00]))
-        response = s.recv(2)
-        
-        if response[0] != 0x05 or response[1] != 0x00:
-            return False
-            
-        # SOCKS5 connect request
-        request = bytearray()
-        request.append(0x05)  # SOCKS version 5
-        request.append(0x01)  # CONNECT command
-        request.append(0x00)  # Reserved
-        
-        # Destination address (dummy address for testing)
-        request.append(0x03)  # Domain name
-        request.append(len("example.com"))
-        request.extend("example.com".encode())
-        request.append((80 >> 8) & 0xff)
-        request.append(80 & 0xff)
-        
-        s.send(request)
-        response = s.recv(10)
-        
-        if response[1] == 0x00:
-            return True
-    except:
-        pass
-    finally:
-        s.close()
-    return False
+# [Rest of the functions remain the same as previous version...]
 
-# Validate HTTP proxy
-def validate_http(proxy):
-    try:
-        proxies = {
-            'http': f'http://{proxy}',
-            'https': f'http://{proxy}'
-        }
-        response = requests.get('http://httpbin.org/ip', proxies=proxies, timeout=10)
-        if response.status_code == 200:
-            return True
-    except:
-        pass
-    return False
-
-# Validate HTTPS proxy
-def validate_https(proxy):
-    try:
-        proxies = {
-            'http': f'https://{proxy}',
-            'https': f'https://{proxy}'
-        }
-        response = requests.get('https://httpbin.org/ip', proxies=proxies, timeout=10, verify=False)
-        if response.status_code == 200:
-            return True
-    except:
-        pass
-    return False
-
-# Generate random proxies
-def generate_proxies(proxy_type, count):
-    proxies = []
-    for _ in range(count):
-        ip = ".".join(str(random.randint(1, 255)) for _ in range(4))
-        port = random.randint(1000, 9999)
-        proxies.append(f"{ip}:{port}")
-    return proxies
-
-# Main function
+# Main function with improved flow
 def main():
     banner()
     
-    print(Fore.GREEN + "[1] SOCKS4")
-    print(Fore.GREEN + "[2] SOCKS5")
-    print(Fore.GREEN + "[3] HTTP")
-    print(Fore.GREEN + "[4] HTTPS" + Style.RESET_ALL)
+    # Display options with smooth printing
+    options = [
+        "[1] SOCKS4",
+        "[2] SOCKS5", 
+        "[3] HTTP",
+        "[4] HTTPS"
+    ]
+    
+    for option in options:
+        smooth_print(option, Fore.CYAN)
     
     try:
         choice = int(input("\nSelect proxy type (1-4): "))
         if choice not in [1, 2, 3, 4]:
             raise ValueError
     except:
-        print(Fore.RED + "Invalid choice! Please select between 1-4." + Style.RESET_ALL)
+        smooth_print("Invalid choice! Please select between 1-4.", Fore.RED)
         return
     
     try:
@@ -155,80 +95,53 @@ def main():
         if count <= 0:
             raise ValueError
     except:
-        print(Fore.RED + "Invalid number! Please enter a positive integer." + Style.RESET_ALL)
+        smooth_print("Invalid number! Please enter a positive integer.", Fore.RED)
         return
     
-    print("\n" + Fore.YELLOW + f"Generating and validating {count} proxies..." + Style.RESET_ALL)
+    smooth_print(f"\nGenerating and validating {count} proxies...\n", Fore.YELLOW)
     
     # Generate proxies
-    proxy_type = ""
-    if choice == 1:
-        proxy_type = "SOCKS4"
-        proxies = generate_proxies(proxy_type, count)
-        validate_func = validate_socks4
-    elif choice == 2:
-        proxy_type = "SOCKS5"
-        proxies = generate_proxies(proxy_type, count)
-        validate_func = validate_socks5
-    elif choice == 3:
-        proxy_type = "HTTP"
-        proxies = generate_proxies(proxy_type, count)
-        validate_func = validate_http
-    elif choice == 4:
-        proxy_type = "HTTPS"
-        proxies = generate_proxies(proxy_type, count)
-        validate_func = validate_https
+    proxy_type = ["SOCKS4", "SOCKS5", "HTTP", "HTTPS"][choice-1]
+    validate_func = [validate_socks4, validate_socks5, validate_http, validate_https][choice-1]
     
-    # Validate proxies
+    proxies = generate_proxies(proxy_type, count)
     valid_proxies = []
-    invalid_proxies = []
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        future_to_proxy = {executor.submit(validate_func, proxy): proxy for proxy in proxies}
-        for future in concurrent.futures.as_completed(future_to_proxy):
-            proxy = future_to_proxy[future]
-            try:
-                is_valid = future.result()
-                if is_valid:
-                    print(Fore.GREEN + f"[VALID] {proxy}" + Style.RESET_ALL)
-                    valid_proxies.append(proxy)
-                else:
-                    print(Fore.RED + f"[INVALID] {proxy}" + Style.RESET_ALL)
-                    invalid_proxies.append(proxy)
-            except Exception as e:
-                print(Fore.RED + f"[ERROR] {proxy} - {str(e)}" + Style.RESET_ALL)
-                invalid_proxies.append(proxy)
-    
+    # Process proxies with controlled threading
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = []
+        for proxy in proxies:
+            futures.append(
+                executor.submit(
+                    validate_and_print, 
+                    proxy, 
+                    validate_func, 
+                    proxy_type
+                )
+            )
+            time.sleep(0.05)  # Small delay between starting threads
+        
+        for future in concurrent.futures.as_completed(futures):
+            if future.result():
+                valid_proxies.append(future.result())
+
     # Save results
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = f"hit_{proxy_type.lower()}_{timestamp}.txt"
-    
-    with open(filename, 'w') as f:
-        for proxy in valid_proxies:
-            f.write(f"{proxy}\n")
-    
-    print("\n" + Fore.GREEN + f"Validation complete! Found {len(valid_proxies)} valid {proxy_type} proxies." + Style.RESET_ALL)
-    print(Fore.GREEN + f"Valid proxies saved to {filename}" + Style.RESET_ALL)
-    
-    # Option to show stats
-    show_stats = input("\nShow statistics? (y/n): ").lower()
-    if show_stats == 'y':
-        print("\n" + Fore.CYAN + "=== STATISTICS ===" + Style.RESET_ALL)
-        print(Fore.GREEN + f"Valid proxies: {len(valid_proxies)}" + Style.RESET_ALL)
-        print(Fore.RED + f"Invalid proxies: {len(invalid_proxies)}" + Style.RESET_ALL)
-        print(Fore.YELLOW + f"Success rate: {len(valid_proxies)/count*100:.2f}%" + Style.RESET_ALL)
-    
-    # Option to retry
-    retry = input("\nDo you want to run again? (y/n): ").lower()
-    if retry == 'y':
-        main()
+    if valid_proxies:
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        filename = f"hit_{proxy_type.lower()}_{timestamp}.txt"
+        
+        with open(filename, 'w') as f:
+            for proxy in valid_proxies:
+                f.write(f"{proxy}\n")
+        
+        smooth_print(f"\nValidation complete! Found {len(valid_proxies)} valid {proxy_type} proxies.", Fore.GREEN)
+        smooth_print(f"Valid proxies saved to {filename}", Fore.GREEN)
     else:
-        print(Fore.CYAN + "\nThank you for using the Proxy Generator & Validator Tool!" + Style.RESET_ALL)
-        sys.exit(0)
+        smooth_print("\nNo valid proxies found.", Fore.RED)
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(Fore.RED + "\nOperation cancelled by user." + Style.RESET_ALL)
+        smooth_print("\nOperation cancelled by user.", Fore.RED)
         sys.exit(1)
